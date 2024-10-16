@@ -1,38 +1,122 @@
-#
-# This is a Plumber API. In RStudio 1.2 or newer you can run the API by
-# clicking the 'Run API' button above.
-#
-# In RStudio 1.1 or older, see the Plumber documentation for details
-# on running the API.
-#
-# Find out more about building APIs with Plumber here:
-#
-#    https://www.rplumber.io/
-#
-
 library(plumber)
 
 #* @apiTitle Plumber Example API
+#* 
+library(dplyr)
+library(readr)
 
-#* Echo back the input
-#* @param msg The message to echo
-#* @get /echo
-function(msg=""){
-  list(msg = paste0("The message is: '", msg, "'"))
+# Carregar o banco de dados CSV (ou criar se não existir)
+file_path <- "dados_regressao.csv"
+
+if (!file.exists(file_path)) {
+  # Criar um CSV vazio com os nomes das colunas
+  write_csv(data.frame(x = numeric(), grupo = character(), y = numeric(), momento_registro = character()), file_path)
 }
 
-#* Plot a histogram
-#* @serializer png
-#* @get /plot
-function(){
-  rand <- rnorm(100)
-  hist(rand)
+#* Adicionar novo registro ao banco de dados
+#* @param x Valor de x
+#* @param grupo Valor de grupo
+#* @param y Valor de y
+#* @post /inserir
+function(req, res, x = NULL, grupo = NULL, y = NULL) {
+  
+  # Verificar se todos os parâmetros estão presentes
+  if (is.null(x) || is.null(grupo) || is.null(y)) {
+    res$status <- 400
+    return(list(error = "Parâmetros 'x', 'grupo' e 'y' são obrigatórios."))
+  }
+  
+  # Converter os parâmetros e garantir que x e y sejam numéricos
+  x <- as.numeric(x)
+  y <- as.numeric(y)
+  
+  if (is.na(x) || is.na(y)) {
+    res$status <- 400
+    return(list(error = "'x' e 'y' devem ser valores numéricos."))
+  }
+  
+  # Ler o banco de dados existente
+  db <- read_csv(file_path)
+  
+  # Criar uma nova linha
+  novo_registro <- tibble(
+    id = nrow(db) + 1,
+    x = x,
+    grupo = grupo,
+    y = y,
+    momento_registro = lubridate::now()
+  )
+  
+  # Adicionar o novo registro ao banco de dados
+  db <- rbind(db, novo_registro)
+  
+  # Escrever de volta ao arquivo CSV
+  write_csv(db, file_path)
+  
+  return(list(message = "Registro inserido com sucesso", data = novo_registro))
 }
 
-#* Return the sum of two numbers
-#* @param a The first number to add
-#* @param b The second number to add
-#* @post /sum
-function(a, b){
-  as.numeric(a) + as.numeric(b)
+
+#* Atualizar um registro existente
+#* @param id ID do registro a ser atualizado
+#* @param x Novo valor de x
+#* @param grupo Novo valor de grupo
+#* @param y Novo valor de y
+#* @put /atualizar
+function(req, res, id = NULL, x = NULL, grupo = NULL, y = NULL) {
+  if (is.null(id)) {
+    res$status <- 400
+    return(list(error = "O parâmetro 'id' é obrigatório para atualizar um registro."))
+  }
+  
+  db <- read_csv(file_path)
+  
+  id <- as.integer(id)
+  registro <- db %>% filter(id == !!id)
+  
+  if (nrow(registro) == 0) {
+    res$status <- 404
+    return(list(error = "Registro com ID fornecido não encontrado."))
+  }
+  
+  # Atualizar os campos, se forem fornecidos
+  # if (!is.null(x)) db <- db %>% mutate(x = ifelse(id == !!id, as.numeric(x), x))
+  # if (!is.null(grupo)) db <- db %>% mutate(grupo = ifelse(id == !!id, grupo, grupo))
+  # if (!is.null(y)) db <- db %>% mutate(y = ifelse(id == !!id, as.numeric(y), y))
+  
+  db[db$id == id,] <- c(id, x, grupo, y)
+  write_csv(db, file_path)
+  
+  return(list(message = "Registro atualizado com sucesso", id = id))
 }
+
+#* Deletar um registro
+#* @param id ID do registro a ser deletado
+#* @delete /deletar
+function(req, res, id = NULL) {
+  if (is.null(id)) {
+    res$status <- 400
+    return(list(error = "O parâmetro 'id' é obrigatório para deletar um registro."))
+  }
+  
+  db <- read_csv(file_path)
+  
+  # Verificar se o ID existe
+  id <- as.integer(id)
+  if (nrow(db %>% filter(id == !!id)) == 0) {
+    res$status <- 404
+    return(list(error = "Registro com ID fornecido não encontrado."))
+  }
+  
+  # Remover o registro
+  db <- db %>% filter(id != !!id)
+  
+  write_csv(db, file_path)
+  
+  return(list(message = "Registro deletado com sucesso", id = id))
+}
+
+# plumber::plumb("api.R")$run(port=8000)
+
+
+
