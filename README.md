@@ -33,19 +33,24 @@ código:
 library(plumber)
 
 # Carregar o arquivo de rotas
-pr <- plumber::plumb("api.R")
+pr <- plumber::plumb("plumber.R")
 
 # Iniciar a API na porta 8000
 pr$run(port = 8000)
 ```
 
-## Exemplos de Endpoints
+## Exemplos
 
 ### /inserir
 
 Insere uma nova observação com os parâmetros `x` (numérico), `grupo`, e
-`y` (numérico). A data e hora da inserção, assim como um ID exclusivo,
-são registrados automaticamente.
+`y` (numérico) no banco de dados. A data e hora da inserção, assim como
+um ID exclusivo, são registrados automaticamente.
+
+**Parâmetros:**  
+- `x`: Valor numérico da variável x.  
+- `grupo`: Grupo a que a observação pertence.  
+- `y`: Valor numérico da variável y.
 
 **Exemplo de requisição:**
 
@@ -57,12 +62,13 @@ curl -X 'POST' \
 
 ### /atualizar
 
-Atualiza os valores de uma observação existente no banco de dados.
+Atualiza os valores de um registro existente no banco de dados.
 
-**Parâmetros:** - `id`: O ID do registro que será atualizado. - `x`:
-Novo valor numérico para a variável independente. - `grupo`: Novo valor
-para o grupo (A, B ou C). - `y`: Novo valor numérico para a variável
-dependente.
+**Parâmetros:**  
+- `id`: O ID do registro que será atualizado.  
+- `x`: Novo valor numérico para a variável x.  
+- `grupo`: Novo valor para o grupo.  
+- `y`: Novo valor numérico para a variável y.
 
 **Exemplo de requisição:**
 
@@ -74,7 +80,10 @@ curl -X 'PUT' \
 
 ### /deletar
 
-Escreva o ID do registro a ser deletado.
+Deleta o registro do ID informado.
+
+**Parâmetros:**  
+- `id`: O ID do registro que será deletado.
 
 **Exemplo de Requisição**
 
@@ -84,10 +93,10 @@ curl -X 'DELETE' \
   -H 'accept: */*'
 ```
 
-### /gráfico
+### /grafico
 
-Ao executar, retorna um gráfico de dispersão dos valores observados com
-retas de regressão em cada grupo no conjunto de dados atual.
+Retorna um gráfico de dispersão dos valores observados com retas de
+regressão em cada grupo no conjunto de dados atual.
 
 **Exemplo de Requisição**
 
@@ -99,9 +108,9 @@ curl -X 'GET' \
 
 ### /ajustar_regressão
 
-Ao executar, ajusta o modelo de regressão (possuindo variável resposta
-y) e retorna as estimativas dos coeficientes da regressão em formato
-JSON. Utiliza as observações contidas no atual conjunto de dados.
+Ajusta o modelo de regressão (possuindo variável resposta y) e retorna
+as estimativas dos coeficientes da regressão em formato JSON. Utiliza as
+observações contidas no atual conjunto de dados.
 
 **Exemplo de Requisição**
 
@@ -113,8 +122,8 @@ curl -X 'GET' \
 
 ### /residuos
 
-Ao executar, retorna os resíduos do modelo ajustado na rota
-“ajustar_regressão” em formato JSON.
+Retorna os resíduos do modelo ajustado na rota “ajustar_regressão” em
+formato JSON.
 
 **Exemplo de Requisição**
 
@@ -126,7 +135,9 @@ curl -X 'GET' \
 
 ### /grafico_residuos
 
-Ao executar, retorna gráficos para diagnóstico dos resíduos.
+Retorna gráficos para diagnóstico dos resíduos, como o gráfico de
+autocorrelação, histograma, QQ-Norm dos resíduos e o um gráico de pontos
+do resíduos x observação.
 
 **Exemplo de Requisição**
 
@@ -138,8 +149,8 @@ curl -X 'GET' \
 
 ### /significancia
 
-Ao executar, retorna o resultado do teste t realizado em cada
-coeficiente do modelo de regressão ajustado.
+Retorna o resultado do teste t realizado em cada coeficiente do modelo
+de regressão ajustado.
 
 **Exemplo de Requisição**
 
@@ -154,8 +165,9 @@ curl -X 'GET' \
 Realiza previsões de `y` com base nos pares `x` e `grupo` fornecidos no
 formato JSON. Os valores preditos de `y` são retornados em formato JSON.
 
-**Parâmetro:** - `x`: Lista em formato JSON contendo os valores de
-`x`(numérico) e `grupo` para os quais a predição será realizada.
+**Parâmetro:**  
+- `new`: Lista em formato JSON contendo os valores de `x`(numérico) e
+`grupo` para os quais a predição será realizada.
 
 **Exemplo de Requisição**
 

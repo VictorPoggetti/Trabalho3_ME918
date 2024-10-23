@@ -121,7 +121,7 @@ function(req) {
   print(p)
 }
 
-#* Ajustar o modelo e obter estimativas da regressão em formato JSON
+#* Ajustar o modelo de regressão linear e obter estimativas
 #* @get /ajustar_regressao
 #* @serializer json
 function() {
