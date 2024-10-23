@@ -57,12 +57,11 @@ function(x = NULL, grupo = NULL, y = NULL) {
 #* @param grupo Novo valor de grupo (opcional)
 #* @param y Novo valor de y (opcional)
 #* @put /atualizar
-function(req, res, id = NULL, x = NULL, grupo = NULL, y = NULL) {
+function(id = NULL, x = NULL, grupo = NULL, y = NULL) {
   
   if (is.null(id)) {
     return(list(error = "O parâmetro 'id' é obrigatório para atualizar um registro."))
   }
-  
   
   id <- as.integer(id)
   registro <- db %>% filter(id == !!id)
@@ -87,7 +86,7 @@ function(req, res, id = NULL, x = NULL, grupo = NULL, y = NULL) {
 #* Deletar um registro
 #* @param id ID do registro a ser deletado
 #* @delete /deletar
-function(req, res, id = NULL) {
+function(id = NULL) {
   if (is.null(id)) {
     return(list(error = "O parâmetro 'id' é obrigatório para deletar um registro."))
   }
@@ -123,7 +122,7 @@ function(req) {
 #* @get /ajuste_regressao
 #* @serializer json
 function() {
-  modelo <- lm(y ~ x + grupo, data = db)
+  modelo <<- lm(y ~ x + grupo, data = db) #salva globalmente o modelo
   
   resultados <- summary(modelo)$coefficients[,1]
   resultados <- as.list(resultados)
@@ -132,18 +131,26 @@ function() {
   return(resultados)
 }
 
-#*Residuos do modelo ajustado
-#*@get /residuos
-function(){
-  modelo <- lm(y ~ x + grupo, data = db)
-  residuos <- toJSON(modelo$residuals)
-  return(residuos)
+#* Residuos do modelo ajustado
+#* @get /residuos
+#* @serializer json
+function() {
+  if (!exists("modelo")) {
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+  }
+  
+  residuos <- modelo$residuals
+  return(toJSON(residuos))
 }
 
 #*Gráfico dos residuos do modelo ajustado
 #*@serializer png
 #*@get /grafico residuos
 function() {
+  if (!exists("modelo")) {
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+  }
+  
   layout(matrix(1:4, nrow = 2, ncol = 2))  
   residuos <- modelo$residuals
   Y_pred <- modelo$fitted.values
@@ -162,6 +169,10 @@ function() {
 #*@get /significancia
 #*@serializer json
 function(){
+  if (!exists("modelo")) {
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+  }
+  
   coeficientes <- summary(modelo)$coefficients
   
   coeficientes_df <- data.frame(
@@ -183,7 +194,11 @@ function(){
 #* @param x Valor de x
 #* @param grupo Grupo da observação
 #* @serializer json
-function(req, res, x, grupo) {
+function(x, grupo) {
+  if (!exists("modelo")) {
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+  }
+  
   if (missing(x) || missing(grupo)) {
     return(list(error = "Os parâmetros 'x' e 'grupo' são obrigatórios."))
   }
@@ -200,6 +215,10 @@ function(req, res, x, grupo) {
 #* @post /predições
 #* @serializer unboxedJSON
 function(x) {
+  if (!exists("modelo")) {
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+  }
+  
   if (is.null(x) || length(x) == 0) {
     return(list(error = "Dados de entrada inválidos"))
   }
@@ -211,7 +230,6 @@ function(x) {
   }
   
   input_data <- as.data.frame(input_data)
-  
   predicoes <- predict(modelo, input_data)
   
   resultado <- list()
