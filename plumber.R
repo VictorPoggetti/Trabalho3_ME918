@@ -195,28 +195,7 @@ function(){
 
 #* Realizar predição
 #* @post /predicao
-#* @param x Valor de x
-#* @param grupo Grupo da observação
-#* @serializer json
-function(x, grupo) {
-  if (!exists("modelo")) {
-    return(list(error = "Modelo não ajustado. Use a rota /ajustar_regressao primeiro."))
-  }
-  
-  if (missing(x) || missing(grupo)) {
-    return(list(error = "Os parâmetros 'x' e 'grupo' são obrigatórios."))
-  }
-  
-  nova_obs <- data.frame(x = as.numeric(x), grupo = as.factor(grupo))
-  predicao <- predict(modelo, newdata = nova_obs)
-  
-  return(list(predicao = predicao))
-}
-
-
-#* Realizar múltiplas predições
 #* @param x Valores de entrada como uma lista de listas (JSON)
-#* @post /predicoes
 #* @serializer json
 function(x) {
   
