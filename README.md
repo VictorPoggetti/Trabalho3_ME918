@@ -1,14 +1,12 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# Trabalho3_ME918
+# API para Ajustar Modelo de Regressão
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-O objetivo do projeto Trabalho3_ME918 é a criação de uma API que
-interage com um conjunto de dados simulado, realiza uma regressão
-linear, além de predições do modelo.
+O objetivo do projeto é a criação de uma API que interage com um conjunto de dados simulado, realiza uma regressão linear, além de predições do modelo.
 
 ## Instruções
 
