@@ -1,3 +1,5 @@
+rm(list = ls())
+
 library(plumber)
 library(dplyr)
 library(readr)
@@ -16,12 +18,11 @@ n <- 25
 x <- rpois(n, lambda = 4) + runif(n, -3, 3)
 grupo <- sample(LETTERS[1:3], size = n, replace = TRUE)
 y <- rnorm(n, mean = b0 + b1*x + bB*(grupo=="B") + bC*(grupo=="C"), sd = 2)
-df <- data.frame(id = seq(1,length(y)), x = x, grupo = grupo, y = y,
+db <- data.frame(id = seq(1,length(y)), x = x, grupo = grupo, y = y,
                  momento_registro = with_tz(now(), tzone = "America/Sao_Paulo"))
-readr::write_csv(df, file = "dados_regressao.csv")
+readr::write_csv(db, file = "dados_regressao.csv")
 
 file_path <- "dados_regressao.csv"
-db <- read_csv(file_path)
 
 #* Adicionar novo registro ao banco de dados
 #* @param x Valor de x
@@ -42,11 +43,13 @@ function(x = NULL, grupo = NULL, y = NULL) {
   }
   
   db <- read_csv(file_path)
+  
   novo_registro <- tibble(id = nrow(db) + 1, x = x, grupo = grupo, y = y, momento_registro = with_tz(now(), tzone = "America/Sao_Paulo")
   )
   
   # Adicionar o novo registro ao banco de dados
   db <- rbind(db, novo_registro)
+  write_csv(db, file_path)
   
   return(list(message = "Registro inserido com sucesso", data = novo_registro))
 }
@@ -62,7 +65,7 @@ function(id = NULL, x = NULL, grupo = NULL, y = NULL) {
   if (is.null(id)) {
     return(list(error = "O parâmetro 'id' é obrigatório para atualizar um registro."))
   }
-  
+  db <- read_csv(file_path)
   id <- as.integer(id)
   registro <- db %>% filter(id == !!id)
   
@@ -79,7 +82,7 @@ function(id = NULL, x = NULL, grupo = NULL, y = NULL) {
   if (!is.null(y)) {
     db[db$id == id, "y"] <- as.numeric(y)
   }
-  
+  write_csv(db, file_path)
   return(list(message = "Registro atualizado com sucesso", id = id))
 }
 
@@ -92,9 +95,11 @@ function(id = NULL) {
   }
   
   id <- as.integer(id)
+  db <- read_csv(file_path)
   if (nrow(db %>% filter(id == !!id)) == 0) {
     return(list(error = "Registro com ID fornecido não encontrado."))
   }
+  
   
   db <- db %>% filter(id != !!id)
   
@@ -119,7 +124,7 @@ function(req) {
 }
 
 #* Ajustar o modelo e obter estimativas da regressão em formato JSON
-#* @get /ajuste_regressao
+#* @get /ajustar_regressao
 #* @serializer json
 function() {
   modelo <<- lm(y ~ x + grupo, data = db) #salva globalmente o modelo
@@ -136,7 +141,7 @@ function() {
 #* @serializer json
 function() {
   if (!exists("modelo")) {
-    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_regressao primeiro."))
   }
   
   residuos <- modelo$residuals
@@ -145,18 +150,17 @@ function() {
 
 #*Gráfico dos residuos do modelo ajustado
 #*@serializer png
-#*@get /grafico residuos
+#*@get /grafico_residuos
 function() {
   if (!exists("modelo")) {
-    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_regressao primeiro."))
   }
   
   layout(matrix(1:4, nrow = 2, ncol = 2))  
   residuos <- modelo$residuals
   Y_pred <- modelo$fitted.values
   
-  plot(Y_pred, residuos, xlab = "Valores Ajustados", ylab = "Resíduos", 
-       pch = 19, ,col = "blue")
+  plot(Y_pred, residuos, xlab = "Valores Ajustados", ylab = "Resíduos", pch = 19, col = "blue")
   abline(h = 0, lty = 2, col = "red")  
   
   hist(residuos, main = "", ylab = "Frequência")       
@@ -170,7 +174,7 @@ function() {
 #*@serializer json
 function(){
   if (!exists("modelo")) {
-    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_regressao primeiro."))
   }
   
   coeficientes <- summary(modelo)$coefficients
@@ -196,7 +200,7 @@ function(){
 #* @serializer json
 function(x, grupo) {
   if (!exists("modelo")) {
-    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_regressao primeiro."))
   }
   
   if (missing(x) || missing(grupo)) {
@@ -212,32 +216,28 @@ function(x, grupo) {
 
 #* Realizar múltiplas predições
 #* @param x Valores de entrada como uma lista de listas (JSON)
-#* @post /predições
-#* @serializer unboxedJSON
+#* @post /predicoes
+#* @serializer json
 function(x) {
-  if (!exists("modelo")) {
-    return(list(error = "Modelo não ajustado. Use a rota /ajustar_modelo primeiro."))
-  }
   
-  if (is.null(x) || length(x) == 0) {
+  if(is.null(x) || length(x) == 0){
     return(list(error = "Dados de entrada inválidos"))
   }
   
-  input_data <- jsonlite::fromJSON(x)
+  if (!exists("modelo")) {
+    return(list(error = "Modelo não ajustado. Use a rota /ajustar_regressao primeiro."))
+  }
   
-  if (is.null(input_data) || nrow(input_data) == 0) {
+  
+  input_data <- fromJSON(x)
+  
+  if (is.null(input_data) || nrow(input_data) == 0){
     return(list(error = "Formato JSON inválido ou vazio"))
   }
-  
-  input_data <- as.data.frame(input_data)
   predicoes <- predict(modelo, input_data)
   
-  resultado <- list()
-  for (i in seq_along(predicoes)) {
-    resultado[[i]] <- list(observacao = input_data[i, ], predicao = predicoes[i])
-  }
-  
-  return(resultado)
+  return(predicoes)
 }
+
 
 
