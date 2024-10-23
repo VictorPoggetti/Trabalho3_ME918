@@ -8,7 +8,7 @@ library(ggplot2)
 library(jsonlite)
 
 #* @apiTitle API para Ajustar Modelo de Regressão 
-#* 
+#* @apiDescription Esta API  permite manipular dados de regressão linear, realizar previsões, gerar gráficos e realizar operações como criar, atualizar, deletar um banco de dados em formato CSV.
 
 ra <- 204384
 set.seed(ra)
@@ -19,15 +19,15 @@ x <- rpois(n, lambda = 4) + runif(n, -3, 3)
 grupo <- sample(LETTERS[1:3], size = n, replace = TRUE)
 y <- rnorm(n, mean = b0 + b1*x + bB*(grupo=="B") + bC*(grupo=="C"), sd = 2)
 db <- data.frame(id = seq(1,length(y)), x = x, grupo = grupo, y = y,
-                 momento_registro = with_tz(now(), tzone = "America/Sao_Paulo"))
+                 momento_registro = now())
 readr::write_csv(db, file = "dados_regressao.csv")
 
 file_path <- "dados_regressao.csv"
 
 #* Adicionar novo registro ao banco de dados
-#* @param x Valor de x
-#* @param grupo Valor de grupo
-#* @param y Valor de y
+#* @param x Valor de x (numérico)
+#* @param grupo Grupo ao qual pertence
+#* @param y Valor de y (numérico)
 #* @post /inserir
 function(x = NULL, grupo = NULL, y = NULL) {
   
@@ -43,28 +43,25 @@ function(x = NULL, grupo = NULL, y = NULL) {
   }
   
   db <- read_csv(file_path)
-  
-  novo_registro <- tibble(id = nrow(db) + 1, x = x, grupo = grupo, y = y, momento_registro = with_tz(now(), tzone = "America/Sao_Paulo")
-  )
-  
-  # Adicionar o novo registro ao banco de dados
-  db <- rbind(db, novo_registro)
-  write_csv(db, file_path)
+
+  novo_registro <- tibble(id = nrow(db) + 1, x = x, grupo = grupo, y = y, momento_registro = lubridate::now())
+  write.table(novo_registro, file = file_path, sep = ",", col.names = FALSE, 
+              row.names = FALSE, append = TRUE, quote = TRUE)
   
   return(list(message = "Registro inserido com sucesso", data = novo_registro))
 }
 
 #* Atualizar um registro existente
 #* @param id ID do registro a ser atualizado
-#* @param x Novo valor de x (opcional)
-#* @param grupo Novo valor de grupo (opcional)
-#* @param y Novo valor de y (opcional)
+#* @param x Novo valor de x
+#* @param grupo Novo valor do grupo ao qual pertence
+#* @param y Novo valor de y
 #* @put /atualizar
 function(id = NULL, x = NULL, grupo = NULL, y = NULL) {
-  
   if (is.null(id)) {
     return(list(error = "O parâmetro 'id' é obrigatório para atualizar um registro."))
   }
+
   db <- read_csv(file_path)
   id <- as.integer(id)
   registro <- db %>% filter(id == !!id)
@@ -81,7 +78,9 @@ function(id = NULL, x = NULL, grupo = NULL, y = NULL) {
   }
   if (!is.null(y)) {
     db[db$id == id, "y"] <- as.numeric(y)
+    db[db$id == id, 'momento_registro'] <- lubridate::now()
   }
+  
   write_csv(db, file_path)
   return(list(message = "Registro atualizado com sucesso", id = id))
 }
@@ -99,7 +98,6 @@ function(id = NULL) {
   if (nrow(db %>% filter(id == !!id)) == 0) {
     return(list(error = "Registro com ID fornecido não encontrado."))
   }
-  
   
   db <- db %>% filter(id != !!id)
   
@@ -179,12 +177,11 @@ function(){
   
   coeficientes <- summary(modelo)$coefficients
   
-  coeficientes_df <- data.frame(
-    Estimativas = coeficientes[, 1],
-    Erro_Est = coeficientes[, 2],
-    Valor_t = coeficientes[, 3],
-    P_valor = coeficientes[, 4],
-    row.names = rownames(coeficientes), 
+  coeficientes_df <- data.frame(Coeficiente = rownames(coeficientes),
+    Estimativa = coeficientes[, 1],
+    Erro_Padrao = coeficientes[, 2],
+    valor_t = coeficientes[, 3],
+    p_valor = coeficientes[, 4],
     stringsAsFactors = FALSE 
   )
   
@@ -194,12 +191,12 @@ function(){
 }
 
 #* Realizar predição
-#* @post /predicao
-#* @param x Valores de entrada como uma lista de listas (JSON)
+#* @get /predicao
+#* @param new Valores de entrada no formato JSON
 #* @serializer json
-function(x) {
+function(new) {
   
-  if(is.null(x) || length(x) == 0){
+  if(is.null(new) || length(new) == 0){
     return(list(error = "Dados de entrada inválidos"))
   }
   
@@ -207,14 +204,13 @@ function(x) {
     return(list(error = "Modelo não ajustado. Use a rota /ajustar_regressao primeiro."))
   }
   
-  
-  input_data <- fromJSON(x)
+  input_data <- fromJSON(new)
   
   if (is.null(input_data) || nrow(input_data) == 0){
     return(list(error = "Formato JSON inválido ou vazio"))
   }
   predicoes <- predict(modelo, input_data)
-  
+
   return(predicoes)
 }
 
