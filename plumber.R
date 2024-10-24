@@ -10,18 +10,6 @@ library(jsonlite)
 #* @apiTitle API para Ajustar Modelo de Regressão 
 #* @apiDescription Esta API  permite manipular dados de regressão linear, realizar previsões, gerar gráficos e realizar operações como criar, atualizar, deletar um banco de dados em formato CSV.
 
-ra <- 204384
-set.seed(ra)
-b0 <- runif(1, -2, 2); b1 <- runif(1, -2, 2)
-bB <- 2; bC <- 3
-n <- 25
-x <- rpois(n, lambda = 4) + runif(n, -3, 3)
-grupo <- sample(LETTERS[1:3], size = n, replace = TRUE)
-y <- rnorm(n, mean = b0 + b1*x + bB*(grupo=="B") + bC*(grupo=="C"), sd = 2)
-db <- data.frame(id = seq(1,length(y)), x = x, grupo = grupo, y = y,
-                 momento_registro = now())
-readr::write_csv(db, file = "dados_regressao.csv")
-
 file_path <- "dados_regressao.csv"
 
 #* Adicionar novo registro ao banco de dados
@@ -109,7 +97,8 @@ function(id = NULL) {
 #* @get /grafico 
 #* @serializer png
 function(req) {
-  
+  db <- read_csv(file_path)
+
   p <- ggplot(data = db, aes(x = x, y = y, colour = grupo)) +
     geom_point() + geom_smooth(method = "lm", se = FALSE) +  
     labs(title = "Gráfico com Retas de Regressão por Grupo",
@@ -125,7 +114,8 @@ function(req) {
 #* @get /ajustar_regressao
 #* @serializer json
 function() {
-  modelo <<- lm(y ~ x + grupo, data = db) #salva globalmente o modelo
+  db <- read_csv(file_path)
+  modelo <<- lm(y ~ x + grupo, data = db)       #salva globalmente o modelo
   
   resultados <- summary(modelo)$coefficients[,1]
   resultados <- as.list(resultados)
