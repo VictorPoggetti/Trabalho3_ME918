@@ -8,7 +8,7 @@ library(ggplot2)
 library(jsonlite)
 
 #* @apiTitle API para Ajustar Modelo de Regressão 
-#* @apiDescription Esta API  permite ajustar um modelo de regressão linear, realizar previsões, gerar gráficos e realizar operações como criar, atualizar, deletar uma observação no banco de dados em formato CSV.
+#* @apiDescription Esta API permite ajustar um modelo de regressão linear, realizar predições, gerar gráficos e realizar operações como criar, atualizar e deletar uma observação no banco de dados em formato CSV.
 
 file_path <- "dados_regressao.csv"
 
